@@ -5,3 +5,4 @@ djangorestframework
 markdown
 django-filter
 drf-yasg[validation]
+django-unfold
