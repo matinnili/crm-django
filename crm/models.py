@@ -58,12 +58,18 @@ class Call(models.Model):
     customer_id= models.ForeignKey(Customer, on_delete=models.CASCADE)
     agent_id = models.ForeignKey(Agent, on_delete=models.CASCADE)
     call_start_time=models.DateTimeField(auto_now_add=True)
-    call_end_time=models.DateTimeField(auto_now=True)
-    call_duration=models.DurationField()
+    call_end_time=models.DateTimeField(null=False)
+    call_duration=models.DurationField(null=True,blank=True)
     call_status= models.CharField(CallStatus.choices, max_length=10)
     call_purpose = models.CharField(CallPurpose.choices, max_length=10)
     notes = models.TextField(blank=True, null=True)
     recording_url = models.URLField(blank=True, null=True)
+
+    @property
+    def call_duration(self):
+        if self.call_start_time and self.call_end_time:
+            return self.call_end_time - self.call_start_time
+        return None
 
     def __str__(self):
         return f"Call {self.call_id} - Agent {self.agent_id} ({self.call_start_time} to {self.call_end_time})"

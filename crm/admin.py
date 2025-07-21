@@ -7,6 +7,8 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.models import User, Group
+from django.db.models import Count, ExpressionWrapper, DurationField, F, FloatField
+from django.db.models.functions import ExtractSecond, ExtractMinute, ExtractHour, Extract
 
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from unfold.admin import ModelAdmin
@@ -15,7 +17,7 @@ from django.contrib import admin
 from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import RangeDateFilter, RangeDateTimeFilter
 
-from django.db.models.functions import TruncMonth
+from django.db.models.functions import TruncMonth,TruncDay, TruncYear
 from django.db.models import Count
 import json
 from django.contrib.admin import SimpleListFilter
@@ -38,21 +40,67 @@ class TimeIntervalFilter(SimpleListFilter):
         return months
 
     def queryset(self, request, queryset):
+
         return queryset
 
-class ChartTypeFilter(SimpleListFilter):
-    title = 'Chart Type'
-    parameter_name = 'chart'
+class IntervalGroup(SimpleListFilter):
+    title = 'group_by'
+    parameter_name = 'interval'
 
     def lookups(self, request, model_admin):
         return [
-            ('bar', 'Bar'),
-            ('pie', 'Pie'),
+            ('day', 'Day'),
+            ('month', 'Month'),
+            ('year', 'Year'),
         ]
 
     def queryset(self, request, queryset):
         return queryset
 
+class Purposefilter(SimpleListFilter):
+    title = 'call_purpose'
+    parameter_name = 'call_purpose'
+
+    def lookups(self, request, model_admin):
+        return [
+            ('pi', 'Price Inquiry'),
+            ('wc', 'Warranty Claim'),
+        ]
+
+    def queryset(self, request, queryset):  
+        if self.value() == 'price_inquiry':
+            return queryset.filter(call_purpose='pi')
+        elif self.value() == 'warranty_claim':
+            return queryset.filter(call_purpose='wc')
+
+        return queryset
+
+class Statusfilter(SimpleListFilter):
+    title = 'call_status'
+    parameter_name = 'call_status'
+
+    def lookups(self, request, model_admin):
+        return [("a", "Answered"),
+                ("m", "Missed"),
+                ("v", "Voicemail"),
+                ("b", "Busy"),
+                ("f", "Failed")
+
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value() == 'a':
+            return queryset.filter(call_status='a')
+        elif self.value() == 'm':
+            return queryset.filter(call_status='m')
+        elif self.value() == 'v':
+            return queryset.filter(call_status='v')
+        elif self.value() == 'b':
+            return queryset.filter(call_status='b')
+        elif self.value() == 'f':
+            return queryset.filter(call_status='f')
+
+        return queryset
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin, ModelAdmin):
@@ -63,17 +111,28 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
 
 @admin.register(Call)
 class CallAdmin(ModelAdmin):
+    list_display=("call_start_time","call_end_time","call_duration")
     list_filter_submit = True  # Submit button at the bottom of the filter
     change_list_template = "admin/change_call_list.html"
-    list_filter = [TimeIntervalFilter, ChartTypeFilter]
+    list_filter = [TimeIntervalFilter, IntervalGroup,Purposefilter,Statusfilter]
 
     def changelist_view(self, request, extra_context=None):
 
         extra_context = extra_context or {}
-
-        # Get selected month from GET
+        qs = self.get_queryset(request)
+        objects=Call.objects.all()
+        print(f"----------this is type{type((objects[0].call_duration))}")        # Get selected month from GET
         selected_month = request.GET.get('month')
-        # selected_month = request.GET.get('month')
+        purpose= request.GET.get('call_purpose')
+        status= request.GET.get('call_status')
+        interval= request.GET.get('interval')
+        if interval == 'month':
+            trunc = TruncMonth
+        elif interval == 'year':
+            trunc = TruncYear
+        else:
+            trunc = TruncDay
+
         print(selected_month)
 
         # Calculate the last 12 months
@@ -84,34 +143,82 @@ class CallAdmin(ModelAdmin):
             key = dt.strftime('%Y-%m')
             label = dt.strftime('%B %Y')
             months.append((key, label))
+        qs_with_duration = qs.annotate(
+            duration_minutes=F("call_end_time") - F("call_start_time")
+        ).values("duration_minutes").annotate(seconds=Extract('duration_minutes', 'epoch')).values("seconds")
+        print(f"-----------------this is duration{qs_with_duration}")
 
+# Round down to nearest minute for grouping
+        # from django.db.models.functions import Floor
+        # qs_with_duration = qs_with_duration.annotate(
+        #     minutes=Extract('duration_minutes','epoch')).values("minutes")
+        
+        # print(f"-----------------this is duration{qs_with_duration}")
+        
+
+
+# Group by rounded duration in minutes
+        
+
+# )
         # Apply month filter
-        qs = self.get_queryset(request)
+        
         if selected_month:
+            print("--------------------hi")
             try:
                 year, month = map(int, selected_month.split('-'))
-                start = datetime(year, month, 1)
+                start = datetime.datetime(year, month, 1)
                 if month == 12:
-                    end = datetime(year + 1, 1, 1)
+                    end = datetime.datetime(year + 1, 1, 1)
                 else:
-                    end = datetime(year, month + 1, 1)
+                    end = datetime.datetime(year, month + 1, 1)
+                print("--------------------hi")
                 qs = qs.filter(call_start_time__gte=start, call_end_time__lt=end)
-            except:
-                pass
+                print([i for i in qs])
+            except Exception as e:
+                print(f"Error parsing month: {e}")
+        if purpose:
+            qs = qs.filter(call_purpose=purpose)
+            print(f"Filtered by purpose: {qs}")
+        if status:
+            qs = qs.filter(call_status=status)
+            print(f"Filtered by status: {len(qs)}")
 
         # Group by call_purpose
-        grouped = (
+        grouped_purpose = (
             qs.values('call_purpose')
               .annotate(total=Count('call_id'))
               .order_by('-total')
         )
+        grouped_status = (
+            qs.values('call_status')
+              .annotate(total=Count('call_id'))
+              .order_by('-total')
+        )
+        grouped_date = (
+        qs.annotate(period=trunc('call_start_time'))
+          .values('period')
+          .annotate(total=Count('call_id'))
+          .order_by('period')
+    )
 
-        chart_labels = [entry['call_purpose'] for entry in grouped]
-        chart_data = [entry['total'] for entry in grouped]
+        chart_labels = [entry['call_purpose'] for entry in grouped_purpose]
+        chart_data = [entry['total'] for entry in grouped_purpose]
+        chart_labels_status = [entry['call_status'] for entry in grouped_status]
+        chart_data_status = [entry['total'] for entry in grouped_status]
+        chart_labels_date = [entry['period'].strftime('%Y-%m') for entry in grouped_date]
+        chart_data_date = [entry['total'] for entry in grouped_date]
+        # line_labels = [int(entry['rounded_minutes']) for entry in distribution]
+        # line_data = [entry['count'] for entry in distribution]
+
 
         extra_context.update({
             'chart_labels': chart_labels,
             'chart_data': chart_data,
+            'chart_labels_status': chart_labels_status,
+            'chart_data_status': chart_data_status,
+            'chart_labels_date': chart_labels_date,
+            'chart_data_date': chart_data_date,
             'selected_month': selected_month,
             'month_choices': months,
         })

@@ -3,13 +3,30 @@
 
 
 
-  <div style="width: 600px;">
+<div style="display: flex; gap: 20px;">
+  <div style="width: 300px;">
     <canvas id="chart"></canvas>
   </div>
+  <div style="width: 300px;">
+    <canvas id="statusChart"></canvas>
+  </div>
+</div>
+<div style="width: 600px; margin-top: 20px;">
+  <canvas id="dateChart"></canvas>
+</div>
+<div style="margin-top: 40px;">
+  <h3>Call Duration Distribution (minutes)</h3>
+  <canvas id="durationLineChart"></canvas>
+</div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     const ctx = document.getElementById('chart').getContext('2d');
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    const dateCtx = document.getElementById('dateChart').getContext('2d');
+    const durationCtx = document.getElementById("durationLineChart").getContext("2d");
+    
+
     new Chart(ctx, {
         type: 'pie',
         data: {
@@ -29,6 +46,87 @@
             responsive: true
         }
     });
+    new Chart(statusCtx, {
+        type: 'pie',
+        data: {
+            labels: {{ chart_labels_status|safe }},
+            datasets: [{
+                label: 'Call Status',
+                data: {{ chart_data_status|safe }},
+                backgroundColor: [
+                    'rgba(54, 162, 235, 0.6)',
+                    'rgba(255, 159, 64, 0.6)',
+                    'rgba(75, 192, 192, 0.6)',
+                    'rgba(153, 102, 255, 0.6)',
+                ]
+            }]
+        },
+        options: {
+            responsive: true
+        }
+    });
+    new Chart(dateCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_labels_date|safe }},
+            datasets: [{
+                label: 'Calls Over Time',
+                data: {{ chart_data_date|safe }},
+                borderColor: 'rgba(75, 192, 192, 1)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Number of Calls'
+                    }
+                }
+            }
+        }
+    });
+    new Chart(durationCtx, {
+    type: "line",
+    data: {
+      labels: {{ line_chart_labels|safe }},
+      datasets: [{
+        label: "Number of Calls",
+        data: {{ line_chart_data|safe }},
+        borderColor: "rgba(75, 192, 192, 1)",
+        fill: false,
+        tension: 0.2
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: 'Duration (minutes)'
+          }
+        },
+        y: {
+          title: {
+            display: true,
+            text: 'Number of Calls'
+          },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+      
   </script>
 
   {{ block.super }}
