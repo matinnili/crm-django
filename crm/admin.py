@@ -19,19 +19,23 @@ from django.db.models.functions import TruncMonth
 from django.db.models import Count
 import json
 from django.contrib.admin import SimpleListFilter
+import datetime
 
 
 
 class TimeIntervalFilter(SimpleListFilter):
-    title = 'Time Interval'
-    parameter_name = 'interval'
+    title = 'month_filter'
+    parameter_name = 'month'
 
     def lookups(self, request, model_admin):
-        return [
-            ('day', 'Day'),
-            ('month', 'Month'),
-            ('year', 'Year'),
-        ]
+        today = datetime.datetime.today()
+        months = []
+        for i in range(12):
+            dt = today.replace(day=1) - datetime.timedelta(days=i*30)
+            key = dt.strftime('%Y-%m')
+            label = dt.strftime('%B %Y')
+            months.append((key, label))
+        return months
 
     def queryset(self, request, queryset):
         return queryset
@@ -64,50 +68,99 @@ class CallAdmin(ModelAdmin):
     list_filter = [TimeIntervalFilter, ChartTypeFilter]
 
     def changelist_view(self, request, extra_context=None):
+
         extra_context = extra_context or {}
 
-        # Read filter values from request.GET
-        interval = request.GET.get('interval', 'month')
-        chart_type = request.GET.get('chart', 'bar')
+        # Get selected month from GET
+        selected_month = request.GET.get('month')
+        # selected_month = request.GET.get('month')
+        print(selected_month)
 
-        # Choose grouping function
-        from django.db.models.functions import TruncDay, TruncMonth, TruncYear
-        from django.db.models import Count
+        # Calculate the last 12 months
+        today = datetime.datetime.today()
+        months = []
+        for i in range(12):
+            dt = today.replace(day=1) - datetime.timedelta(days=i*30)
+            key = dt.strftime('%Y-%m')
+            label = dt.strftime('%B %Y')
+            months.append((key, label))
 
-        if interval == 'day':
-            trunc = TruncDay
-        elif interval == 'year':
-            trunc = TruncYear
-        else:
-            trunc = TruncMonth
-
+        # Apply month filter
         qs = self.get_queryset(request)
+        if selected_month:
+            try:
+                year, month = map(int, selected_month.split('-'))
+                start = datetime(year, month, 1)
+                if month == 12:
+                    end = datetime(year + 1, 1, 1)
+                else:
+                    end = datetime(year, month + 1, 1)
+                qs = qs.filter(call_start_time__gte=start, call_end_time__lt=end)
+            except:
+                pass
+
+        # Group by call_purpose
         grouped = (
-            qs.annotate(period=trunc('call_start_time'))
-              .values('period')
+            qs.values('call_purpose')
               .annotate(total=Count('call_id'))
-              .order_by('period')
+              .order_by('-total')
         )
 
-        # Format chart data
-        if interval == 'day':
-            labels = [entry['period'].strftime('%Y-%m-%d') for entry in grouped]
-        elif interval == 'year':
-            labels = [entry['period'].strftime('%Y') for entry in grouped]
-        else:
-            labels = [entry['period'].strftime('%B %Y') for entry in grouped]
+        chart_labels = [entry['call_purpose'] for entry in grouped]
+        chart_data = [entry['total'] for entry in grouped]
 
         extra_context.update({
-            'chart_labels': labels,
-            'chart_data': [entry['total'] for entry in grouped],
-            'selected_chart': chart_type,
-            'selected_interval': interval,
+            'chart_labels': chart_labels,
+            'chart_data': chart_data,
+            'selected_month': selected_month,
+            'month_choices': months,
         })
+
+        # extra_context = extra_context or {}
+
+        # Read filter values from request.GET
+        # interval = request.GET.get('interval', 'month')
+        # chart_type = request.GET.get('chart', 'bar')
+
+        # # Choose grouping function
+        # from django.db.models.functions import TruncDay, TruncMonth, TruncYear
+        # from django.db.models import Count
+
+        # if interval == 'day':
+        #     trunc = TruncDay
+        # elif interval == 'year':
+        #     trunc = TruncYear
+        # else:
+        #     trunc = TruncMonth
+
+        # qs = self.get_queryset(request)
+        # grouped = (
+        #     qs.annotate(period=trunc('call_start_time'))
+        #       .values('period')
+        #       .annotate(total=Count('call_id'))
+        #       .order_by('period')
+        # )
+
+        # Format chart data
+        # if interval == 'day':
+        #     labels = [entry['period'].strftime('%Y-%m-%d') for entry in grouped]
+        # elif interval == 'year':
+        #     labels = [entry['period'].strftime('%Y') for entry in grouped]
+        # else:
+        #     labels = [entry['period'].strftime('%B %Y') for entry in grouped]
+ 
+        # extra_context.update({
+        #    'chart_labels': labels,
+        #     'chart_data': [entry['total'] for entry in grouped],
+        #     'selected_chart': chart_type,
+        #     'selected_interval': interval,
+        # })
 
         return super().changelist_view(request, extra_context=extra_context)
 
-@admin.register(Agent)
+@admin.register(Agent,Customer)
 class CustomAdminClass(ModelAdmin):
-    pass
+    list_display=('email','phone_number')
+    
 # Register your models here.
 

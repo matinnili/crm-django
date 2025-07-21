@@ -26,24 +26,26 @@ class Sentiment(models.TextChoices):
 
 class Agent(models.Model):
     customer_id = models.AutoField(primary_key=True)
-    first_name = models.CharField(max_length=50)
-    last_name = models.CharField(max_length=50)
+    first_name = models.CharField(max_length=50,null=True)
+    last_name = models.CharField(max_length=50,null=True)
     role= models.CharField(max_length=20, choices=Role.choices)
-    email = models.EmailField(unique=True)
+    email = models.EmailField(unique=True,null=False)
     phone_number = models.CharField(max_length=15, unique=True,null=False)
-    role= models.CharField(max_length=20, choices=Role.choices)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} ({self.email})"
 
 
 class Customer(models.Model):
     customer_id = models.AutoField(primary_key=True)
-    first_name = models.CharField(max_length=50)
-    last_name = models.CharField(max_length=50)
+    first_name = models.CharField(max_length=50,null=True)
+    last_name = models.CharField(max_length=50,null=True)
    
-    email = models.EmailField(unique=True)
+    email = models.EmailField(unique=True,null=False)
     phone_number = models.CharField(max_length=15, unique=True,null=False)
-    role= models.CharField(max_length=20, choices=Role.choices)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -60,7 +62,6 @@ class Call(models.Model):
     call_duration=models.DurationField()
     call_status= models.CharField(CallStatus.choices, max_length=10)
     call_purpose = models.CharField(CallPurpose.choices, max_length=10)
-    call_purpose = models.CharField(max_length=250)
     notes = models.TextField(blank=True, null=True)
     recording_url = models.URLField(blank=True, null=True)
 
