@@ -10,18 +10,18 @@ class CallStatus(models.TextChoices):
     Failed = 'f', 'Failed'
 
 class CallPurpose(models.TextChoices):
-    PriceInquiry = 'pi', 'Price Inquiry'
-    WarrantyClaim = 'wc', 'Warranty Claim'
+    PriceInquiry =  'Price Inquiry'
+    WarrantyClaim =  'Warranty Claim'
 
 class Role(models.TextChoices):
-    Agent = 'a', 'Agent'
-    Supervisor = 's', 'Supervisor'
-    admin = 'm', 'Manager'
+    Agent ='Agent'
+    Supervisor = 'Supervisor'
+    admin =  'Manager'
 
 class Sentiment(models.TextChoices):
-    Positive = 'positive', 'Positive'
-    Neutral = 'neutral', 'Neutral'
-    Negative = 'negative', 'Negative'
+    Positive =  'Positive'
+    Neutral =  'Neutral'
+    Negative =  'Negative'
 
 
 class Agent(models.Model):
@@ -57,7 +57,7 @@ class Call(models.Model):
     call_id = models.AutoField(primary_key=True)
     customer_id= models.ForeignKey(Customer, on_delete=models.CASCADE)
     agent_id = models.ForeignKey(Agent, on_delete=models.CASCADE)
-    call_start_time=models.DateTimeField(auto_now_add=True)
+    call_start_time=models.DateTimeField(null=False)
     call_end_time=models.DateTimeField(null=False)
     call_duration=models.DurationField(null=True,blank=True)
     call_status= models.CharField(CallStatus.choices, max_length=10)

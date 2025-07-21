@@ -2,7 +2,8 @@ from django.contrib import admin
 from unfold.admin import ModelAdmin
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from unfold.admin import ModelAdmin
-from .models import Agent, Customer, Call
+from unfold.contrib.filters.admin import RangeDateFilter, RangeDateTimeFilter
+from .models import Agent, Customer, Call,AiCallAnalysis
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
@@ -25,23 +26,23 @@ import datetime
 
 
 
-class TimeIntervalFilter(SimpleListFilter):
-    title = 'month_filter'
-    parameter_name = 'month'
+# class TimeIntervalFilter(SimpleListFilter):
+#     title = 'month_filter'
+#     parameter_name = 'month'
 
-    def lookups(self, request, model_admin):
-        today = datetime.datetime.today()
-        months = []
-        for i in range(12):
-            dt = today.replace(day=1) - datetime.timedelta(days=i*30)
-            key = dt.strftime('%Y-%m')
-            label = dt.strftime('%B %Y')
-            months.append((key, label))
-        return months
+#     def lookups(self, request, model_admin):
+#         today = datetime.datetime.today()
+#         months = []
+#         for i in range(12):
+#             dt = today.replace(day=1) - datetime.timedelta(days=i*30)
+#             key = dt.strftime('%Y-%m')
+#             label = dt.strftime('%B %Y')
+#             months.append((key, label))
+#         return months
 
-    def queryset(self, request, queryset):
+#     def queryset(self, request, queryset):
 
-        return queryset
+#         return queryset
 
 class IntervalGroup(SimpleListFilter):
     title = 'group_by'
@@ -63,15 +64,15 @@ class Purposefilter(SimpleListFilter):
 
     def lookups(self, request, model_admin):
         return [
-            ('pi', 'Price Inquiry'),
-            ('wc', 'Warranty Claim'),
+            ('Price Inquiry', 'Price Inquiry'),
+            ('Warranty Claim', 'Warranty Claim'),
         ]
 
     def queryset(self, request, queryset):  
-        if self.value() == 'price_inquiry':
-            return queryset.filter(call_purpose='pi')
-        elif self.value() == 'warranty_claim':
-            return queryset.filter(call_purpose='wc')
+        if self.value() == 'Price Inquiry':
+            return queryset.filter(call_purpose='Price Inquiry')
+        elif self.value() == 'Warranty Claim':
+            return queryset.filter(call_purpose='Warranty Claim')
 
         return queryset
 
@@ -114,7 +115,7 @@ class CallAdmin(ModelAdmin):
     list_display=("call_start_time","call_end_time","call_duration")
     list_filter_submit = True  # Submit button at the bottom of the filter
     change_list_template = "admin/change_call_list.html"
-    list_filter = [TimeIntervalFilter, IntervalGroup,Purposefilter,Statusfilter]
+    list_filter = [IntervalGroup,Purposefilter,Statusfilter,  ("call_start_time",RangeDateFilter)]
 
     def changelist_view(self, request, extra_context=None):
 
@@ -126,6 +127,15 @@ class CallAdmin(ModelAdmin):
         purpose= request.GET.get('call_purpose')
         status= request.GET.get('call_status')
         interval= request.GET.get('interval')
+        date_start=request.GET.get('call_start_time_from')
+        if date_start:
+            qs=qs.filter(call_start_time__gte=date_start)
+        
+        print(f"-----------------this is date_start{date_start}")
+        date_end=request.GET.get('call_start_time_to')
+        if date_end:
+            qs=qs.filter(call_start_time__lte=date_end)
+        print(f"-----------------this is date_end{date_end}")
         if interval == 'month':
             trunc = TruncMonth
         elif interval == 'year':
@@ -137,16 +147,16 @@ class CallAdmin(ModelAdmin):
 
         # Calculate the last 12 months
         today = datetime.datetime.today()
-        months = []
-        for i in range(12):
-            dt = today.replace(day=1) - datetime.timedelta(days=i*30)
-            key = dt.strftime('%Y-%m')
-            label = dt.strftime('%B %Y')
-            months.append((key, label))
-        qs_with_duration = qs.annotate(
-            duration_minutes=F("call_end_time") - F("call_start_time")
-        ).values("duration_minutes").annotate(seconds=Extract('duration_minutes', 'epoch')).values("seconds")
-        print(f"-----------------this is duration{qs_with_duration}")
+        # months = []
+        # for i in range(12):
+        #     dt = today.replace(day=1) - datetime.timedelta(days=i*30)
+        #     key = dt.strftime('%Y-%m')
+        #     label = dt.strftime('%B %Y')
+        #     months.append((key, label))
+        # qs_with_duration = qs.annotate(
+        #     duration_minutes=F("call_end_time") - F("call_start_time")
+        # ).values("duration_minutes").annotate(seconds=Extract('duration_minutes', 'epoch')).values("seconds")
+        # print(f"-----------------this is duration{qs_with_duration}")
 
 # Round down to nearest minute for grouping
         # from django.db.models.functions import Floor
@@ -163,20 +173,20 @@ class CallAdmin(ModelAdmin):
 # )
         # Apply month filter
         
-        if selected_month:
-            print("--------------------hi")
-            try:
-                year, month = map(int, selected_month.split('-'))
-                start = datetime.datetime(year, month, 1)
-                if month == 12:
-                    end = datetime.datetime(year + 1, 1, 1)
-                else:
-                    end = datetime.datetime(year, month + 1, 1)
-                print("--------------------hi")
-                qs = qs.filter(call_start_time__gte=start, call_end_time__lt=end)
-                print([i for i in qs])
-            except Exception as e:
-                print(f"Error parsing month: {e}")
+        # if selected_month:
+        #     print("--------------------hi")
+        #     try:
+        #         year, month = map(int, selected_month.split('-'))
+        #         start = datetime.datetime(year, month, 1)
+        #         if month == 12:
+        #             end = datetime.datetime(year + 1, 1, 1)
+        #         else:
+        #             end = datetime.datetime(year, month + 1, 1)
+        #         print("--------------------hi")
+        #         qs = qs.filter(call_start_time__gte=start, call_end_time__lt=end)
+        #         print([i for i in qs])
+        #     except Exception as e:
+        #         print(f"Error parsing month: {e}")
         if purpose:
             qs = qs.filter(call_purpose=purpose)
             print(f"Filtered by purpose: {qs}")
@@ -188,12 +198,12 @@ class CallAdmin(ModelAdmin):
         grouped_purpose = (
             qs.values('call_purpose')
               .annotate(total=Count('call_id'))
-              .order_by('-total')
+              .order_by('total')
         )
         grouped_status = (
             qs.values('call_status')
               .annotate(total=Count('call_id'))
-              .order_by('-total')
+              .order_by('total')
         )
         grouped_date = (
         qs.annotate(period=trunc('call_start_time'))
@@ -220,7 +230,7 @@ class CallAdmin(ModelAdmin):
             'chart_labels_date': chart_labels_date,
             'chart_data_date': chart_data_date,
             'selected_month': selected_month,
-            'month_choices': months,
+            # 'month_choices': months,
         })
 
         # extra_context = extra_context or {}
@@ -268,6 +278,14 @@ class CallAdmin(ModelAdmin):
 @admin.register(Agent,Customer)
 class CustomAdminClass(ModelAdmin):
     list_display=('email','phone_number')
+@admin.register(AiCallAnalysis)
+class AiCallAnalysisAdmin(ModelAdmin):
+    list_display = ('call', 'sentiment')
+    list_filter = [("call__call_start_time",RangeDateFilter)]
+    search_fields = ('call__customer_id__first_name', 'call__customer_id__last_name', 'call__agent_id__first_name', 'call__agent_id__last_name')
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('call', 'call__customer_id', 'call__agent_id')
     
 # Register your models here.
 
