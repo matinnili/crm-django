@@ -30,6 +30,9 @@
     const labels = {{ chart_labels|safe }};
     const data = {{ chart_data|safe }};
     const total = data.reduce((a, b) => a + b, 0);
+    const labels_status={{ chart_labels_status|safe }};
+    const data_status = {{ chart_data_status|safe }};
+    const total_status = data.reduce((a, b) => a + b, 0);
     const ctx = document.getElementById('chart').getContext('2d');
     const statusCtx = document.getElementById('statusChart').getContext('2d');
     const dateCtx = document.getElementById('dateChart').getContext('2d');
@@ -75,10 +78,10 @@
     new Chart(statusCtx, {
         type: 'pie',
         data: {
-            labels: {{ chart_labels_status|safe }},
+            labels: labels_status,
             datasets: [{
-                label: 'Percentage',
-                data: {{ chart_data_status|safe }},
+                
+                data: data_status,
                 backgroundColor: [
                     'rgba(54, 162, 235, 0.6)',
                     'rgba(255, 159, 64, 0.6)',
@@ -88,8 +91,22 @@
             }]
         },
         options: {
-            responsive: true
+      responsive: true,
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              const value = context.raw;
+              const percentage = ((value / total) * 100).toFixed(1);
+              return `${context.label}: ${value} (${percentage}%)`;
+            }
+          }
+        },
+        legend: {
+          position: 'bottom'
         }
+      }
+    }
     });
     new Chart(dateCtx, {
         type: 'bar',
