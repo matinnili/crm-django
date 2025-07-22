@@ -61,7 +61,7 @@ class Call(models.Model):
     agent_id = models.ForeignKey(Agent, on_delete=models.CASCADE)
     call_start_time=models.DateTimeField(null=False)
     call_end_time=models.DateTimeField(null=False)
-    call_duration=models.DurationField(null=True, blank=True)
+    call_duration=models.DurationField()
     call_status= models.CharField(CallStatus.choices,max_length=40)
     call_purpose = models.CharField(CallPurpose.choices,max_length=40)
     notes = models.TextField(blank=True, null=True)

@@ -26,6 +26,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
+
+    const labels = {{ chart_labels|safe }};
+    const data = {{ chart_data|safe }};
+    const total = data.reduce((a, b) => a + b, 0);
     const ctx = document.getElementById('chart').getContext('2d');
     const statusCtx = document.getElementById('statusChart').getContext('2d');
     const dateCtx = document.getElementById('dateChart').getContext('2d');
@@ -38,10 +42,10 @@
     new Chart(ctx, {
         type: 'pie',
         data: {
-            labels: {{ chart_labels|safe }},
+            labels: labels,
             datasets: [{
-                label: 'Calls',
-                data: {{ chart_data|safe }},
+                
+                data: data,
                 backgroundColor: [
                     'rgba(75, 192, 192, 0.6)',
                     'rgba(255, 99, 132, 0.6)',
@@ -51,15 +55,29 @@
             }]
         },
         options: {
-            responsive: true
+      responsive: true,
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              const value = context.raw;
+              const percentage = ((value / total) * 100).toFixed(1);
+              return `${context.label}: ${value} (${percentage}%)`;
+            }
+          }
+        },
+        legend: {
+          position: 'bottom'
         }
+      }
+    }
     });
     new Chart(statusCtx, {
         type: 'pie',
         data: {
             labels: {{ chart_labels_status|safe }},
             datasets: [{
-                label: 'Calls',
+                label: 'Percentage',
                 data: {{ chart_data_status|safe }},
                 backgroundColor: [
                     'rgba(54, 162, 235, 0.6)',

@@ -25,6 +25,7 @@ from django.contrib.admin import SimpleListFilter
 import datetime
 import math
 import pandas as pd
+from django.db import models
 
 
 # class TimeIntervalFilter(SimpleListFilter):
@@ -44,6 +45,11 @@ import pandas as pd
 #     def queryset(self, request, queryset):
 
 #         return queryset
+
+
+class AnalysisInline(admin.TabularInline):
+    model= AiCallAnalysis
+
 
 class IntervalGroup(SimpleListFilter):
     title = 'group_by'
@@ -138,6 +144,7 @@ class CallAdmin(ModelAdmin):
     change_list_template = "admin/change_call_list.html"
     search_fields=["notes"]
     list_filter = [IntervalGroup,Purposefilter,Statusfilter,  ("call_start_time",RangeDateFilter)]
+    inlines=[AnalysisInline]
 
     def changelist_view(self, request, extra_context=None):
 
@@ -148,6 +155,7 @@ class CallAdmin(ModelAdmin):
         
         qs = self.get_queryset(request)
         objects=Call.objects.all()
+        calls_number=len(objects)
         print(f"----------this is type{type((objects[0].call_duration))}")        # Get selected month from GET
         selected_month = request.GET.get('month')
         purpose= request.GET.get('call_purpose')
@@ -285,14 +293,17 @@ class CallAdmin(ModelAdmin):
 
         grouped_purpose = (
             qs.values('call_purpose')
-              .annotate(total=Count('call_id'))
-              .order_by('total')
+              .annotate(percentage=Count('call_id'))
+              .order_by('percentage')
         )
+        
         grouped_status = (
             qs.values('call_status')
-              .annotate(total=Count('call_id'))
-              .order_by('total')
+              .annotate(percentage=Count('call_id'))
+              .order_by('percentage')
         )
+        print(f"-----------this is grouped purpose {grouped_status[0]}")
+        print(f"---------this is len_qs{len(qs)}")
         grouped_date = (
         qs.annotate(period=trunc('call_start_time'))
           .values('period')
@@ -301,9 +312,10 @@ class CallAdmin(ModelAdmin):
     )
 
         chart_labels = [entry['call_purpose'] for entry in grouped_purpose]
-        chart_data = [entry['total'] for entry in grouped_purpose]
+        chart_data = [entry['percentage'] for entry in grouped_purpose]
+        print(f"---------------this is chart data{chart_data}")
         chart_labels_status = [entry['call_status'] for entry in grouped_status]
-        chart_data_status = [entry['total'] for entry in grouped_status]
+        chart_data_status = [entry['percentage'] for entry in grouped_status]
         chart_labels_date = [entry['period'].strftime('%Y-%m') for entry in grouped_date]
         chart_data_date = [entry['total'] for entry in grouped_date]
         # line_labels = [int(entry['rounded_minutes']) for entry in distribution]
@@ -365,10 +377,12 @@ class CallAdmin(ModelAdmin):
 
 class CallInline(admin.TabularInline):
     model = Call
+
 @admin.register(Agent, Customer)
 class CustomAdminClass(ModelAdmin):
     # list_display=('email','phone_number')
     inlines = [CallInline,]
+
 @admin.register(AiCallAnalysis)
 class AiCallAnalysisAdmin(ModelAdmin):
     list_display = ('call', 'sentiment')
