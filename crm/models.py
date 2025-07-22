@@ -1,17 +1,18 @@
 from django.db import models
 
+from django.db.models import F
 
 
 class CallStatus(models.TextChoices):
-    Answered = 'a', 'Answered'
-    Missed = 'm', 'Missed'
-    Voicemail = 'v', 'Voicemail'
-    Busy = 'b', 'Busy'
-    Failed = 'f', 'Failed'
+    Answered = 'Answered'
+    Missed = 'Missed'
+    Voicemail = 'Voicemail'
+    Busy = 'Busy'
+    Failed = 'Failed'
 
 class CallPurpose(models.TextChoices):
-    PriceInquiry =  'Price Inquiry'
-    WarrantyClaim =  'Warranty Claim'
+    PriceInquiry = 'Price Inquiry'
+    WarrantyClaim = 'Warranty Claim'
 
 class Role(models.TextChoices):
     Agent ='Agent'
@@ -22,6 +23,7 @@ class Sentiment(models.TextChoices):
     Positive =  'Positive'
     Neutral =  'Neutral'
     Negative =  'Negative'
+
 
 
 class Agent(models.Model):
@@ -59,9 +61,9 @@ class Call(models.Model):
     agent_id = models.ForeignKey(Agent, on_delete=models.CASCADE)
     call_start_time=models.DateTimeField(null=False)
     call_end_time=models.DateTimeField(null=False)
-    call_duration=models.DurationField(null=True,blank=True)
-    call_status= models.CharField(CallStatus.choices, max_length=10)
-    call_purpose = models.CharField(CallPurpose.choices, max_length=10)
+    call_duration=models.DurationField(null=True, blank=True)
+    call_status= models.CharField(CallStatus.choices,max_length=40)
+    call_purpose = models.CharField(CallPurpose.choices,max_length=40)
     notes = models.TextField(blank=True, null=True)
     recording_url = models.URLField(blank=True, null=True)
 
@@ -79,7 +81,7 @@ class AiCallAnalysis(models.Model):
     call = models.ForeignKey(Call, on_delete=models.CASCADE, related_name='ai_analysis')
     sentiment=models.CharField(Sentiment.choices, max_length=10)
     keywords = models.TextField()
-    action_items = models.TextField()
+    action_items = models.TextField(null=True, blank=True)
     analysis_date = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

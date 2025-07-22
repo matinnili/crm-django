@@ -6,3 +6,5 @@ markdown
 django-filter
 drf-yasg[validation]
 django-unfold
+pandas
+django-computedfields

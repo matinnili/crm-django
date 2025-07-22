@@ -23,7 +23,8 @@ from django.db.models import Count
 import json
 from django.contrib.admin import SimpleListFilter
 import datetime
-
+import math
+import pandas as pd
 
 
 # class TimeIntervalFilter(SimpleListFilter):
@@ -81,25 +82,45 @@ class Statusfilter(SimpleListFilter):
     parameter_name = 'call_status'
 
     def lookups(self, request, model_admin):
-        return [("a", "Answered"),
-                ("m", "Missed"),
-                ("v", "Voicemail"),
-                ("b", "Busy"),
-                ("f", "Failed")
+        return [("Answered", "Answered"),
+                ("Missed", "Missed"),
+                ("Voicemail", "Voicemail"),
+                ("Busy", "Busy"),
+                ("Failed", "Failed")
 
         ]
 
     def queryset(self, request, queryset):
-        if self.value() == 'a':
-            return queryset.filter(call_status='a')
-        elif self.value() == 'm':
-            return queryset.filter(call_status='m')
-        elif self.value() == 'v':
-            return queryset.filter(call_status='v')
-        elif self.value() == 'b':
-            return queryset.filter(call_status='b')
-        elif self.value() == 'f':
-            return queryset.filter(call_status='f')
+        if self.value() == 'Answered':
+            return queryset.filter(call_status='Answered')
+        elif self.value() == 'Missed':
+            return queryset.filter(call_status='Missed')
+        elif self.value() == 'Voicemail':
+            return queryset.filter(call_status='Voicemail')
+        elif self.value() == 'Busy':
+            return queryset.filter(call_status='Busy')
+        elif self.value() == 'Failed':
+            return queryset.filter(call_status='Failed')
+
+        return queryset
+class Sentimentfilter(SimpleListFilter):
+    title = 'sentiment'
+    parameter_name = 'sentiment'
+
+    def lookups(self, request, model_admin):
+        return [
+            ('Positive', 'Positive'),
+            ('Neutral', 'Neutral'),
+            ('Negative', 'Negative'),
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value() == 'Positive':
+            return queryset.filter(sentiment='Positive')
+        elif self.value() == 'Neutral':
+            return queryset.filter(sentiment='Neutral')
+        elif self.value() == 'Negative':
+            return queryset.filter(sentiment='Negative')
 
         return queryset
 
@@ -115,11 +136,16 @@ class CallAdmin(ModelAdmin):
     list_display=("call_start_time","call_end_time","call_duration")
     list_filter_submit = True  # Submit button at the bottom of the filter
     change_list_template = "admin/change_call_list.html"
+    search_fields=["notes"]
     list_filter = [IntervalGroup,Purposefilter,Statusfilter,  ("call_start_time",RangeDateFilter)]
 
     def changelist_view(self, request, extra_context=None):
 
         extra_context = extra_context or {}
+        call_durations = [[math.floor(i.call_duration.total_seconds()/60),i.call_start_time.day\
+        ,i.call_start_time.month,i.call_start_time.year] for i in Call.objects.all()]
+        print(f"-----------------this is call_durations{call_durations}")
+        
         qs = self.get_queryset(request)
         objects=Call.objects.all()
         print(f"----------this is type{type((objects[0].call_duration))}")        # Get selected month from GET
@@ -146,7 +172,7 @@ class CallAdmin(ModelAdmin):
         print(selected_month)
 
         # Calculate the last 12 months
-        today = datetime.datetime.today()
+        # today = datetime.datetime.today()
         # months = []
         # for i in range(12):
         #     dt = today.replace(day=1) - datetime.timedelta(days=i*30)
@@ -195,6 +221,68 @@ class CallAdmin(ModelAdmin):
             print(f"Filtered by status: {len(qs)}")
 
         # Group by call_purpose
+        grouped_qs = (
+        qs.annotate(day=TruncDay('call_start_time'))
+          .values('day', 'call_purpose')
+          .annotate(total=Count('call_id'))
+          .order_by('day')
+    )
+        grouped_bar_status= (
+            qs.annotate(day=TruncDay('call_start_time'))
+            .values('day', 'call_status')
+            .annotate(total=Count('call_id'))
+            .order_by('day')
+        )
+        # print(f"-----------------this is grouped_qs{grouped_qs}")
+        # print(f"-----------------this is grouped_bar_status{grouped_bar_status}")
+
+    # Process data into structure suitable for Chart.js
+        from collections import defaultdict
+        import datetime
+
+        day_labels = sorted({entry['day'].date() for entry in grouped_qs})
+        purposes = list({entry['call_purpose'] for entry in grouped_qs})
+        statuses = list({entry['call_status'] for entry in grouped_bar_status})
+
+    # Map: purpose -> day -> count
+        data_map = {purpose: {day: 0 for day in day_labels} for purpose in purposes}
+        for entry in grouped_qs:
+            day = entry['day'].date()
+            purpose = entry['call_purpose']
+            data_map[purpose][day] = entry['total']
+        data_map_status = {status: {day: 0 for day in day_labels} for status in statuses}
+        for entry in grouped_bar_status:
+            day = entry['day'].date()
+            status = entry['call_status']
+            data_map_status[status][day] = entry['total']
+
+        datasets = []
+        colors = ["#4dc9f6", "#f67019", "#f53794", "#537bc4", "#acc236"]
+        colors_status = ["#4dc9f6", "#f67019", "#f53794", "#537bc4", "#acc236"]
+        for i, purpose in enumerate(purposes):
+            datasets.append({
+                "label": purpose,
+                "data": [data_map[purpose][day] for day in day_labels],
+                "backgroundColor": colors[i % len(colors)]
+            })
+        datasets_status = []
+        for i, status in enumerate(statuses):
+            datasets_status.append({
+                "label": status,
+                "data": [data_map_status[status][day] for day in day_labels],
+                "backgroundColor": colors_status[i % len(colors_status)]
+            })
+
+
+        extra_context.update({
+            "bar_chart_labels": [day.strftime("%Y-%m-%d") for day in day_labels],
+            "bar_chart_datasets": datasets,
+        })
+        extra_context.update({
+            "bar_chart_labels_status": [day.strftime("%Y-%m-%d") for day in day_labels],
+            "bar_chart_datasets_status": datasets_status,
+        })
+
         grouped_purpose = (
             qs.values('call_purpose')
               .annotate(total=Count('call_id'))
@@ -275,14 +363,74 @@ class CallAdmin(ModelAdmin):
 
         return super().changelist_view(request, extra_context=extra_context)
 
-@admin.register(Agent,Customer)
+class CallInline(admin.TabularInline):
+    model = Call
+@admin.register(Agent, Customer)
 class CustomAdminClass(ModelAdmin):
-    list_display=('email','phone_number')
+    # list_display=('email','phone_number')
+    inlines = [CallInline,]
 @admin.register(AiCallAnalysis)
 class AiCallAnalysisAdmin(ModelAdmin):
     list_display = ('call', 'sentiment')
     list_filter = [("call__call_start_time",RangeDateFilter)]
-    search_fields = ('call__customer_id__first_name', 'call__customer_id__last_name', 'call__agent_id__first_name', 'call__agent_id__last_name')
+    search_fields = ('call__customer_id__first_name', 'call__customer_id__last_name', 'call__agent_id__first_name', \
+    'call__agent_id__last_name',"keywords")
+    change_list_template = "admin/change_ai_analysis_list.html"
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        qs = self.get_queryset(request)
+        self.queryset = qs
+        # Get the selected month from GET parameters
+        sentiment = request.GET.get('sentiment')
+        if sentiment:
+            self.queryset = self.queryset.filter(sentiment=sentiment)
+        sentiment_grouped = (
+            self.queryset.values('sentiment')
+            .annotate(total=Count('analysis_id'))
+            .order_by('sentiment')
+        )
+        sentiment_grouped_bar= (
+        qs.annotate(day=TruncDay('call__call_start_time'))
+          .values('day', 'sentiment')
+          .annotate(total=Count('call__call_id'))
+          .order_by('day')
+    )
+        from collections import defaultdict
+        import datetime
+
+        day_labels = sorted({entry['day'].date() for entry in sentiment_grouped_bar})
+        sentiments = list({entry['sentiment'] for entry in sentiment_grouped_bar})
+        # Map: sentiment -> day -> count
+        data_map = {sentiment: {day: 0 for day in day_labels} for sentiment in sentiments}
+        for entry in sentiment_grouped_bar:
+            day = entry['day'].date()
+            sentiment = entry['sentiment']
+            data_map[sentiment][day] = entry['total']   
+        datasets = []
+        colors = ["#4dc9f6", "#f67019", "#f53794", "#537bc4", "#acc236"]
+        for i, sentiment in enumerate(sentiments):
+            datasets.append({
+                "label": sentiment,
+                
+                "data": [data_map[sentiment][day] for day in day_labels],
+                "backgroundColor": colors[i % len(colors)]
+            })      
+        print(f"datasets: {datasets}")
+        extra_context.update({
+            "bar_chart_labels": [day.strftime("%Y-%m-%d") for day in day_labels],
+            "bar_chart_datasets": datasets,
+        })
+        # Prepare data for the chart
+
+        chart_labels = [entry['sentiment'] for entry in sentiment_grouped]
+        chart_data = [entry['total'] for entry in sentiment_grouped]
+        extra_context.update({
+            'chart_labels': chart_labels,
+            'chart_data': chart_data,
+        })
+
+
+        return super().changelist_view(request, extra_context=extra_context)
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('call', 'call__customer_id', 'call__agent_id')

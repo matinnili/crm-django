@@ -26,12 +26,13 @@ SECRET_KEY = 'django-insecure-od#f!64$y_))w)q^lpqx4!m!t6gwy=--ga4b3li4#h*k7cm#(l
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["184.145.155.117","76.71.171.219","184.145.155.117","76.71.171.219"]
+ALLOWED_HOSTS = ["184.145.155.117","76.71.171.219","184.145.155.117","76.71.171.219","76.71.171.219"]
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'computedfields',
     'unfold',   
     "unfold.contrib.filters",  # optional, if special filters are needed
     "unfold.contrib.forms",  # optional, if special form elements are needed
