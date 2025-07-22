@@ -9,6 +9,8 @@ class CallStatus(models.TextChoices):
     Voicemail = 'Voicemail'
     Busy = 'Busy'
     Failed = 'Failed'
+    def __str__(self):
+        return "call_status"
 
 class CallPurpose(models.TextChoices):
     PriceInquiry = 'Price Inquiry'
