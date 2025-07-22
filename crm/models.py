@@ -64,8 +64,8 @@ class Call(models.Model):
     call_start_time=models.DateTimeField(null=False)
     call_end_time=models.DateTimeField(null=False)
     call_duration=models.DurationField()
-    call_status= models.CharField(CallStatus.choices,max_length=40)
-    call_purpose = models.CharField(CallPurpose.choices,max_length=40)
+    call_status= models.CharField(choices=CallStatus.choices,max_length=40,verbose_name="Status")
+    call_purpose = models.CharField(choices=CallPurpose.choices,max_length=40,verbose_name='Purpose')
     notes = models.TextField(blank=True, null=True)
     recording_url = models.URLField(blank=True, null=True)
 
@@ -81,7 +81,7 @@ class Call(models.Model):
 class AiCallAnalysis(models.Model):
     analysis_id = models.AutoField(primary_key=True)
     call = models.ForeignKey(Call, on_delete=models.CASCADE, related_name='ai_analysis')
-    sentiment=models.CharField(Sentiment.choices, max_length=10)
+    sentiment=models.CharField(choices=Sentiment.choices, max_length=10, verbose_name="Sentiment")
     keywords = models.TextField()
     action_items = models.TextField(null=True, blank=True)
     analysis_date = models.DateTimeField(auto_now_add=True)
