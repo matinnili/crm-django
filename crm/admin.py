@@ -146,6 +146,7 @@ class CallAdmin(ModelAdmin):
     list_filter = [IntervalGroup,Purposefilter,Statusfilter,  ("call_start_time",RangeDateFilter)]
     inlines=[AnalysisInline]
 
+
     def changelist_view(self, request, extra_context=None):
 
         extra_context = extra_context or {}
@@ -154,7 +155,8 @@ class CallAdmin(ModelAdmin):
         print(f"-----------------this is call_durations{call_durations}")
         
         qs = self.get_queryset(request)
-        objects=Call.objects.all()
+        objects=Call.objects.filter(call_status="Answered")
+        print(f"----------this is list{[object.call_duration for object in objects]}")
         calls_number=len(objects)
         print(f"----------this is type{type((objects[0].call_duration))}")        # Get selected month from GET
         selected_month = request.GET.get('month')
