@@ -8,3 +8,4 @@ drf-yasg[validation]
 django-unfold
 pandas
 django-computedfields
+psycopg2-binary>=2.9

@@ -1,0 +1,24 @@
+
+services:
+  backend:
+    build: .
+    container_name: backend
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "3008:8000"
+    environment:
+      - SECRET_KEY=test
+      - DEBUG=True
+  database:
+    image: postgres:latest
+    container_name: postgres_db
+    environment:
+      POSTGRES_DB: crm_db
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: 33333333
+    ports:
+      - "3009:5432"
+    volumes:
+      - ./data:/var/lib/postgresql/data
