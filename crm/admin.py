@@ -3,7 +3,7 @@ from unfold.admin import ModelAdmin
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import RangeDateFilter, RangeDateTimeFilter
-from .models import Agent, Customer, Call,AiCallAnalysis
+from .models import Agent, Customer, Call,AiCallAnalysis,Ticket, TicketReply, Order,OrderItem,product,Warranty,WarrantyClaim
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
@@ -47,8 +47,7 @@ from django.db import models
 #         return queryset
 
 
-class AnalysisInline(admin.TabularInline):
-    model= AiCallAnalysis
+
 
 
 class IntervalGroup(SimpleListFilter):
@@ -128,7 +127,19 @@ class Sentimentfilter(SimpleListFilter):
         elif self.value() == 'Negative':
             return queryset.filter(sentiment='Negative')
 
-        return queryset
+        return 
+class TicketReplyInline(admin.TabularInline):
+    model = TicketReply
+class OrderItemInline(admin.TabularInline):
+    model = OrderItem
+class AnalysisInline(admin.TabularInline):
+    model= AiCallAnalysis
+
+class CallInline(admin.TabularInline):
+    model = Call
+class OrderInline(admin.TabularInline):
+    model = Order
+    
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin, ModelAdmin):
@@ -377,13 +388,25 @@ class CallAdmin(ModelAdmin):
 
         return super().changelist_view(request, extra_context=extra_context)
 
-class CallInline(admin.TabularInline):
-    model = Call
 
 @admin.register(Agent, Customer)
 class CustomAdminClass(ModelAdmin):
     # list_display=('email','phone_number')
-    inlines = [CallInline,]
+    inlines = [CallInline,OrderInline]
+    change_form_template = 'admin/agent_change_view.html'
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        agent = Agent.objects.get(agent_id=object_id)
+        calls= Call.objects.filter(agent_id=object_id)
+        qs=calls.values("call_purpose").annotate(total=Count('call_id')).order_by('call_purpose')
+        labels= [entry['call_purpose'] for entry in qs]
+        data= [entry['total'] for entry in qs]
+        extra_context.update({
+            'chart_labels': labels,
+            'chart_data': data,
+        })
+        extra_context['agent'] = agent
+        return super().change_view(request, object_id, form_url, extra_context=extra_context)
 
 @admin.register(AiCallAnalysis)
 class AiCallAnalysisAdmin(ModelAdmin):
@@ -452,4 +475,49 @@ class AiCallAnalysisAdmin(ModelAdmin):
         return super().get_queryset(request).select_related('call', 'call__customer_id', 'call__agent_id')
     
 # Register your models here.
+
+
+    
+    
+@admin.register(Ticket)
+class TicketAdmin(ModelAdmin):
+    list_display = ('ticket_id', 'customer', 'aasigned_agent', 'subject', 'status', 'priority', 'source', 'created_at')
+    list_filter = ('status', 'priority', 'source', ('created_at', RangeDateTimeFilter))
+    search_fields = ('subject', 'customer__first_name', 'customer__last_name')
+    inlines = [TicketReplyInline]
+@admin.register(TicketReply)
+class TicketReplyAdmin(ModelAdmin):
+    list_display = ('reply_id', 'ticket', 'agent', 'customer', 'body', 'is_internal', 'created_at')
+    list_filter = ('is_internal', ('created_at', RangeDateTimeFilter))
+    search_fields = ('body', 'ticket__subject', 'agent__first_name', 'agent__last_name')
+@admin.register(Order)
+class OrderAdmin(ModelAdmin):
+    list_display = ('order_id', 'customer', 'agent', 'order_date', 'total_amount', 'oredr_status', 'created_at')
+    list_filter = ('oredr_status', ('order_date', RangeDateTimeFilter))
+    search_fields = ('customer__first_name', 'customer__last_name', 'agent__first_name', 'agent__last_name')
+    Inlines = [OrderItemInline]
+@admin.register(OrderItem)
+class OrderItemAdmin(ModelAdmin):
+    list_display = ('order_item_id', 'order', 'product_name', 'quantity', 'unit_price')
+    list_filter = ('order__customer__first_name', 'order__customer__last_name')
+    search_fields = ('product_name', 'order__customer__first_name', 'order__customer__last_name')
+@admin.register(product)
+class ProductAdmin(ModelAdmin):
+    list_display = ('product_id', 'name', 'description', 'price', 'created_at')
+    search_fields = ('name', 'description')
+    list_filter = ('created_at',)
+    Inlines = [OrderItemInline]
+@admin.register(Warranty)
+class WarrantyAdmin(ModelAdmin):
+    list_display = ('warranty_id', 'product_id', 'start_date', 'end_date', 'status')
+    list_filter = ('status', ('start_date', RangeDateTimeFilter), ('end_date', RangeDateTimeFilter))
+    search_fields = ('product__name', 'status')
+@admin.register(WarrantyClaim)
+class WarrantyClaimAdmin(ModelAdmin):
+    list_display = ('claim_id', 'warranty_id', 'customer_id', 'product_id', 'claim_date', 'reported_issue', 'resolution_type', 'resolved_by_agent_id', 'closed_at')
+    list_filter = ('resolution_type', ('claim_date', RangeDateTimeFilter), ('closed_at', RangeDateTimeFilter))
+    search_fields = ('customer_id__first_name', 'customer_id__last_name', 'product_id__name', 'reported_issue')
+
+
+
 
