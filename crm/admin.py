@@ -150,15 +150,15 @@ class CallAdmin(ModelAdmin):
     def changelist_view(self, request, extra_context=None):
 
         extra_context = extra_context or {}
-        call_durations = [[math.floor(i.call_duration.total_seconds()/60),i.call_start_time.day\
-        ,i.call_start_time.month,i.call_start_time.year] for i in Call.objects.all()]
-        print(f"-----------------this is call_durations{call_durations}")
+        # call_durations = [[math.floor(i.call_duration.total_seconds()/60),i.call_start_time.day\
+        # ,i.call_start_time.month,i.call_start_time.year] for i in Call.objects.all()]
+        # print(f"-----------------this is call_durations{call_durations}")
         
         qs = self.get_queryset(request)
         objects=Call.objects.filter(call_status="Answered")
-        print(f"----------this is list{[object.call_duration for object in objects]}")
-        calls_number=len(objects)
-        print(f"----------this is type{type((objects[0].call_duration))}")        # Get selected month from GET
+        # print(f"----------this is list{[object.call_duration for object in objects]}")
+        # calls_number=len(objects)
+        # print(f"----------this is type{type((objects[0].call_duration))}")        # Get selected month from GET
         selected_month = request.GET.get('month')
         purpose= request.GET.get('call_purpose')
         status= request.GET.get('call_status')
@@ -304,8 +304,8 @@ class CallAdmin(ModelAdmin):
               .annotate(percentage=Count('call_id'))
               .order_by('percentage')
         )
-        print(f"-----------this is grouped purpose {grouped_status[0]}")
-        print(f"---------this is len_qs{len(qs)}")
+        # print(f"-----------this is grouped purpose {grouped_status[0]}")
+        # print(f"---------this is len_qs{len(qs)}")
         grouped_date = (
         qs.annotate(period=trunc('call_start_time'))
           .values('period')

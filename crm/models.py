@@ -29,7 +29,7 @@ class Sentiment(models.TextChoices):
 
 
 class Agent(models.Model):
-    customer_id = models.AutoField(primary_key=True)
+    agent_id= models.AutoField(primary_key=True)
     first_name = models.CharField(max_length=50,null=True)
     last_name = models.CharField(max_length=50,null=True)
     role= models.CharField(max_length=20, choices=Role.choices)
@@ -88,5 +88,21 @@ class AiCallAnalysis(models.Model):
 
     def __str__(self):
         return f"Analysis {self.analysis_id} for Call {self.call.call_id}"
+class Ticket(models.Model):
+    ticket_id = models.AutoField(primary_key=True)
+    related_call= models.ForeignKey(Call, on_delete=models.CASCADE, null=True, blank=True)
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
+    aasigned_agent = models.ForeignKey(Agent, on_delete=models.DO_NOTHING ,null=True, blank=True)
+    subject = models.CharField(max_length=255)
+    status = models.CharField(max_length=20, choices=[('Open', 'Open'), ('In Progress', 'In Progress'), ('Closed', 'Closed')], default='Open')
+    priority = models.CharField(max_length=20, choices=[('Low', 'Low'), ('Medium', 'Medium'), ('High', 'High'),('Urgent','Urgent')], default='Medium',verbose_name="Priority")
+    source= models.CharField(max_length=20, choices=[('Email', 'Email'), ('Phone', 'Phone'), ('Web', 'Web'),("Chatbot","Chatbot")], default='Email')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_replied_at = models.DateTimeField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
 
+
+    def __str__(self):
+        return f"Ticket {self.ticket_id} - {self.subject}"
 
