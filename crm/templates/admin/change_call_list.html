@@ -23,6 +23,10 @@
     <h3>Calls Per Day by Status</h3>
     <canvas id="dailyCallChartstatus"></canvas>
   </div>
+  <h3>Call Duration Chart</h3>
+<canvas id="durationLineChart" style="max-height: 400px;"></canvas>
+  <h3>Call Sum Duration Chart</h3>
+<canvas id="durationSumLineChart" style="max-height: 400px;"></canvas>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
@@ -38,7 +42,8 @@
     const dateCtx = document.getElementById('dateChart').getContext('2d');
     const barCtx = document.getElementById("dailyCallChart").getContext("2d");
     const barCtxStatus = document.getElementById("dailyCallChartstatus").getContext("2d");
-
+    const ctx_duration = document.getElementById('durationLineChart').getContext('2d');
+    const ctx_sum_duration= document.getElementById('durationSumLineChart').getContext('2d');
 
     
 
@@ -170,7 +175,13 @@
             responsive: true,
             scales: {
             x: {
-                stacked: false
+                stacked: false,
+                ticks: {
+                    stepsize: 1,
+                    autoSkip: false,
+                    maxRotation: 90,
+                    minRotation: 90
+                }
             },
             y: {
                 beginAtZero: true,
@@ -182,7 +193,55 @@
             }
         }
         });
-      
+        new Chart(ctx_duration, {
+    type: 'line',
+    data: {
+        labels: {{ duration_labels|safe }},
+        datasets: [{
+            label: 'Number of Calls',
+            data: {{ duration_data|safe }},
+            fill: false,
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        scales: {
+            x: {
+                title: { display: true, text: 'Call Duration' }
+            },
+            y: {
+                title: { display: true, text: 'Number of Calls' },
+                beginAtZero: true
+            }
+        }
+    }
+});
+new Chart(ctx_sum_duration, {
+    type: 'line',
+    data: {
+        labels: {{ chart_sum_duration_labels|safe }},
+        datasets: [{
+            label: 'Call duration per day',
+            data: {{ chart_sum_duration_data|safe }},
+            fill: false,
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        scales: {
+            x: {
+                title: { display: true, text: 'Call Duration' }
+            },
+            y: {
+                title: { display: true, text: 'Number of Calls' },
+                beginAtZero: true
+            }
+        }
+    }
+});
+
   </script>
 
   {{ block.super }}

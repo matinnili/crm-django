@@ -19,13 +19,17 @@ from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import RangeDateFilter, RangeDateTimeFilter
 
 from django.db.models.functions import TruncMonth,TruncDay, TruncYear
-from django.db.models import Count
+from django.db.models import Count, Min, Max
 import json
 from django.contrib.admin import SimpleListFilter
 import datetime
+from datetime import timedelta
 import math
 import pandas as pd
 from django.db import models
+import itertools
+import operator
+import numpy as np
 
 
 # class TimeIntervalFilter(SimpleListFilter):
@@ -167,6 +171,16 @@ class CallAdmin(ModelAdmin):
         
         qs = self.get_queryset(request)
         objects=Call.objects.filter(call_status="Answered")
+        call_objects=Call.objects.all()
+        date_range=Call.objects.aggregate(
+            min_date=Min('call_start_time'),
+            max_date=Max('call_start_time')
+        )
+        min_date=date_range['min_date'].date()
+        max_date=date_range['max_date'].date()
+       
+    
+
         # print(f"----------this is list{[object.call_duration for object in objects]}")
         # calls_number=len(objects)
         # print(f"----------this is type{type((objects[0].call_duration))}")        # Get selected month from GET
@@ -177,12 +191,53 @@ class CallAdmin(ModelAdmin):
         date_start=request.GET.get('call_start_time_from')
         if date_start:
             qs=qs.filter(call_start_time__gte=date_start)
+            min_date=date_start.date()
+            call_objects=call_objects.filter(call_start_time__gte=date_start)
         
-        print(f"-----------------this is date_start{date_start}")
+
         date_end=request.GET.get('call_start_time_to')
         if date_end:
             qs=qs.filter(call_start_time__lte=date_end)
-        print(f"-----------------this is date_end{date_end}")
+            call_objects=call_objects.filter(call_start_time__lte=date_end)
+            max_date=date_end.date()
+
+
+        date_list = []
+        current = min_date
+        end_date = max_date
+        while current <= max_date:
+              date_list.append(current)
+              current += timedelta(days=1)
+
+        durations_number=[{"call_duration":math.floor(object.call_duration.total_seconds()/60),
+        "call_id":object.call_id} for object in call_objects]
+        durations_sum=[{"call_duration":math.floor(object.call_duration.total_seconds()/60),
+        "date":object.call_start_time.date()} for object in call_objects]
+        print(f"==============================this is duration sum{durations_sum}")
+        sorted_data_number= sorted(durations_number, key=operator.itemgetter('call_duration'))
+        duration_chart_data=[]
+        for key, group in itertools.groupby(sorted_data_number, key=operator.itemgetter('call_duration')):
+            duration_chart_data.append({"call_duration":key,'call_number':sum(1 for _ in group)})
+
+        sorted_data_sum=sorted(durations_sum, key=operator.itemgetter('date'))
+        duration_chart_data_sum=[]
+        duration_sum=0
+        print(f"------------------the first list{sorted_data_sum}")
+        for key, group in itertools.groupby(sorted_data_sum, key=operator.itemgetter('date')):
+            print(f"--------------this is key {key}")
+            sum_zahremar=sum([i['call_duration'] for i in group])
+            print(f"-------------------------- this is group zahremar {sum_zahremar}")
+            print(f"---------this is i {list(group)}")
+            for i in group:
+                duration_sum+=i["call_duration"]
+                print(f"---------this is part of kooft{i}")
+            print(f"-----------this is kooft sum{duration_sum}")
+            duration_chart_data_sum.append({"date":key,'call_sum_duration':sum_zahremar})
+            print(f"---------------------hard{duration_chart_data_sum[-1]['call_sum_duration']}")
+
+            print(f"-----------this is {np.sum([i[0]['call_duration'] for i in group])}")
+        print(f"------------------------SUM{duration_chart_data_sum}")
+
         if interval == 'month':
             trunc = TruncMonth
         elif interval == 'year':
@@ -264,7 +319,31 @@ class CallAdmin(ModelAdmin):
         day_labels = sorted({entry['day'].date() for entry in grouped_qs})
         purposes = list({entry['call_purpose'] for entry in grouped_qs})
         statuses = list({entry['call_status'] for entry in grouped_bar_status})
+        min_call_duration = min(entry['call_duration'] for entry in duration_chart_data)
+        max_call_duration = max(entry['call_duration'] for entry in duration_chart_data) 
 
+        call_duration_range = range(min_call_duration, max_call_duration + 10)
+        duration_chart_labels = []
+        duration_chart_data_values = []
+        for index,i in enumerate(call_duration_range):
+           duration_chart_labels.append(i)
+           added=0
+           for j in duration_chart_data:
+                
+                if j['call_duration'] == i:
+                    added=1
+                    duration_chart_data_values.append(j['call_number'])
+
+                    print(index)
+      
+           if not added :
+                duration_chart_data_values.append(0)
+
+        element=60
+        determined_index=duration_chart_labels.index(element)
+        print(duration_chart_data_values[determined_index])
+           
+        print(f"--------------this is non-zero value {[duration_chart_labels[index] for index,i in enumerate(call_duration_range) if duration_chart_data_values[index] != 0]}")
     # Map: purpose -> day -> count
         data_map = {purpose: {day: 0 for day in day_labels} for purpose in purposes}
         for entry in grouped_qs:
@@ -331,9 +410,14 @@ class CallAdmin(ModelAdmin):
         chart_data_status = [entry['percentage'] for entry in grouped_status]
         chart_labels_date = [entry['period'].strftime('%Y-%m') for entry in grouped_date]
         chart_data_date = [entry['total'] for entry in grouped_date]
+        sum_duration_labels=[entry["date"] for entry in duration_chart_data_sum]
+        sum_duration_data=[entry["call_sum_duration"] for entry in duration_chart_data_sum]
+        
+        chart_sum_duration_labels=[entry['date'].strftime('%Y-%m') for entry in duration_chart_data_sum]
         # line_labels = [int(entry['rounded_minutes']) for entry in distribution]
         # line_data = [entry['count'] for entry in distribution]
-
+        print(f"----------------------{sum_duration_labels}")
+        print(f"-------------------------{sum_duration_data}")
 
         extra_context.update({
             'chart_labels': chart_labels,
@@ -343,6 +427,10 @@ class CallAdmin(ModelAdmin):
             'chart_labels_date': chart_labels_date,
             'chart_data_date': chart_data_date,
             'selected_month': selected_month,
+            'duration_labels': duration_chart_labels,
+            'duration_data': duration_chart_data_values,
+            'chart_sum_duration_labels': chart_sum_duration_labels,
+            'chart_sum_duration_data' : sum_duration_data
             # 'month_choices': months,
         })
 
